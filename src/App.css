@@ -32,8 +32,13 @@
   font-size: 20px;
 }
 
-.SectionSubtitle {
+.SectionText {
   display: block;
   font-size: 15px;
+}
+
+.SectionTextSmall {
+  display: block;
+  font-size: 12px;
 }
 
