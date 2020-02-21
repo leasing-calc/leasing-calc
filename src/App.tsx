@@ -13,12 +13,8 @@ interface MyState {
     gapPercentage: number,
 }
 
-const wibor3M = 1.71;
-const leasingFullLimit = 184500.00;
-const leasingMixLimit = 165470.85;
-const leasingNoVatLimit = 150000.00;
-const taxProgressive = 0.17;
-const taxFlat = 0.19;
+// todo - planowany harmonogram spłat?
+// todo - sprawdzić czas finansowania i wysokośc gap (-1?)
 
 class App extends Component <MyProps, MyState> {
 
@@ -26,11 +22,11 @@ class App extends Component <MyProps, MyState> {
         super(props);
         this.state = {
             value: 80000,
-            ownContributionPercentage: 20.00,
+            ownContributionPercentage: 20.0,
             financingTime: 36,
-            redemptionAmountPercentage: 1.00,
+            redemptionAmountPercentage: 1.0,
             interestRatePercentage: 0,
-            gapPercentage: 3.00
+            gapPercentage: 3.5
         }
     }
 
@@ -51,6 +47,11 @@ class App extends Component <MyProps, MyState> {
                                value={this.state.value}
                                onChange={this.onValueChange}/>
                         <label> zł</label>
+                        {this.hasReachedLimit() &&
+                        <label className="SectionText">Wartość samochodu przekracza limit {this.leasingLimit()} zł, w
+                            kosztach uzyskania przychodu zostanie ujęte {this.valuePercentageInCosts().toFixed(2)}% jego
+                            wartości.</label>
+                        }
                     </div>
 
                     <div className="Section">
@@ -104,7 +105,7 @@ class App extends Component <MyProps, MyState> {
                         <label> %</label>
                         {!this.state.interestRatePercentage &&
                         <label className="SectionTextSmall">Wartość obliczona na bazie stawki Wibor 3M
-                            wynoszącej {wibor3M}%.</label>}
+                            wynoszącej {this.wibor3m()}%.</label>}
                     </div>
 
                     <div className="Section">
@@ -155,24 +156,41 @@ class App extends Component <MyProps, MyState> {
         this.setState({gapPercentage: Number(event.target.value)});
     };
 
+    hasReachedLimit = () => this.state.value > this.leasingLimit();
+
+    valuePercentageInCosts = () => this.hasReachedLimit() ? this.leasingLimit() * 100 / this.state.value : 100;
+
     ownContributionGross = () => this.state.value / 100 * this.state.ownContributionPercentage;
 
     ownContributionReal = () => this.calcRealCost(this.ownContributionGross());
 
     redemptionAmountGross = () => this.state.value / 100 * this.state.redemptionAmountPercentage;
 
-    wiborBasedInterestRate = () => wibor3M * this.state.financingTime / 12;
+    wiborBasedInterestRate = () => this.wibor3m() * this.state.financingTime / 12;
 
-    gapMonthlyGross = () => this.state.value / 100 * this.state.gapPercentage / this.state.financingTime;
+    financingTimeWithoutRedemption = () => this.state.financingTime - 1; // ostatnia rata to wykup
+
+    gapMonthlyGross = () => this.state.value / 100 * this.state.gapPercentage / this.financingTimeWithoutRedemption();
 
     installmentGross = () => {
-        let totalCost = this.state.value * (100 + this.state.interestRatePercentage) / 100;
-        return (totalCost - this.ownContributionGross() - this.redemptionAmountGross()) / this.state.financingTime + this.gapMonthlyGross();
+        let interestRate = this.state.interestRatePercentage || this.wiborBasedInterestRate();
+        let totalCost = this.state.value * (100 + interestRate) / 100;
+        return (totalCost - this.ownContributionGross() - this.redemptionAmountGross()) / this.financingTimeWithoutRedemption() + this.gapMonthlyGross();
     };
 
     installmentReal = () => this.calcRealCost(this.installmentGross());
 
-    calcRealCost = (value: number) => (value - (value - (value / 1.23)) / 2) * (1 - taxFlat);
+    wibor3m = () => 1.71;
+
+    leasingLimit = () => 165470.85; // todo - użytek mieszany, wyłączny i bez vat
+
+    taxValue = () => 0.19; // todo - podatek progresywny, liniowy, ipbox, inne?
+
+    calcRealCost = (value: number) => {
+        let valueInCosts = value * this.valuePercentageInCosts() / 100;
+        console.log(valueInCosts);
+        return (value - (valueInCosts - (valueInCosts / 1.23)) / 2) * (1 - this.taxValue());
+    }
 
 }
 
